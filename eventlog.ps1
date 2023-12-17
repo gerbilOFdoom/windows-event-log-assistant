@@ -100,8 +100,8 @@ $css = $css+ "</style>"
 }
 
 #Get critical event logs from Windows
-Measure-Command {Read-Eventlog 1 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_CriticalEvents.html" -720 }
+Read-Eventlog 1 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_CriticalEvents.html" -720
 
 #Get error event logs from Windows
-Measure-Command {Read-Eventlog 2 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_ErrorEvents.html" -720}
+Read-Eventlog 2 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_ErrorEvents.html" -720
 
