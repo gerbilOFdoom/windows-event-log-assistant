@@ -91,15 +91,17 @@ $css = $css+ "</style>"
 		    }
 	    }
     }
+    $outputHTML = [System.Collections.Generic.List[object]]::new()
     foreach($entry in $bodyFiltered) {
-      $entry | ConvertTo-HTML -Head $css MachineName,ID,TimeCreated,Message,Duplicates | Out-File -FilePath $saveTo -Append
+      $outputHTML.Add(($entry | ConvertTo-HTML -Head $css MachineName,ID,TimeCreated,Message,Duplicates))
     } 
+   $outputHTML | Out-File -FilePath $saveTo
     Write-Host " -- Squished: $($bodyFiltered.Count)"
 }
 
 #Get critical event logs from Windows
-Read-Eventlog 1 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_CriticalEvents.html" -30
+Measure-Command {Read-Eventlog 1 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_CriticalEvents.html" -720 }
 
 #Get error event logs from Windows
-Read-Eventlog 2 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_ErrorEvents.html" -30
+Measure-Command {Read-Eventlog 2 "$env:USERPROFILE\Desktop\$(get-date -f MM-dd-yyyy)_ErrorEvents.html" -720}
 
