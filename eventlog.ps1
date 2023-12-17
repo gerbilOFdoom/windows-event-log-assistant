@@ -1,10 +1,12 @@
-##First, elevate to admin if not already
+#Simple script to gather data from the event log quickly. 
+
+##First, elevate to admin if not already. Sourced from: https://learn.microsoft.com/en-us/archive/blogs/virtual_pc_guy/a-self-elevating-powershell-script
 # Get the ID and security principal of the current user account
- $myWindowsID=[System.Security.Principal.WindowsIdentity]::GetCurrent()
- $myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWindowsID)
+ $myWindowsID = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+ $myWindowsPrincipal = new-object System.Security.Principal.WindowsPrincipal($myWindowsID)
 
  # Get the security principal for the Administrator role
- $adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
+ $adminRole = [System.Security.Principal.WindowsBuiltInRole]::Administrator
 
  # Check to see if we are currently running "as Administrator"
  if ($myWindowsPrincipal.IsInRole($adminRole))
@@ -38,63 +40,59 @@
 
 ### CSS style
 
-$css= "<style>"
+$css = "<style>"
 
-$css= $css+ "BODY{ text-align: center; background-color:white;}"
+$css = $css+ "BODY{ text-align: center; background-color:white;}"
 
-$css= $css+ "TABLE{    font-family: 'Lucida Sans Unicode', 'Lucida Grande', Sans-Serif;font-size: 12px;margin: 10px;width: 100%;text-align: center;border-collapse: collapse;border-top: 7px solid #004466;border-bottom: 7px solid #004466;}"
+$css = $css+ "TABLE{    font-family: 'Lucida Sans Unicode', 'Lucida Grande', Sans-Serif;font-size: 12px;margin: 10px;width: 100%;text-align: center;border-collapse: collapse;border-top: 7px solid #004466;border-bottom: 7px solid #004466;}"
 
-$css= $css+ "TH{font-size: 13px;font-weight: normal;padding: 1px;background: #cceeff;border-right: 1px solid #004466;border-left: 1px solid #004466;color: #004466;}"
+$css = $css+ "TH{font-size: 13px;font-weight: normal;padding: 1px;background: #cceeff;border-right: 1px solid #004466;border-left: 1px solid #004466;color: #004466;}"
 
-$css= $css+ "TD{padding: 1px;background: #e5f7ff;border-right: 1px solid #004466;border-left: 1px solid #004466;color: #669;hover:black;}"
+$css = $css+ "TD{padding: 1px;background: #e5f7ff;border-right: 1px solid #004466;border-left: 1px solid #004466;color: #669;hover:black;}"
 
-$css= $css+  "TD:hover{ background-color:#004466;}"
+$css = $css+  "TD:hover{ background-color:#004466;}"
 
-$css= $css+ "</style>"
+$css = $css+ "</style>"
 
  function Read-Eventlog {
     param($level, $saveTo, $start)
+
     $data = @{logname="Application", "System"; Level=$level; StartTime=(get-date).adddays($start)}
    try {
       $body = Get-WinEvent -FilterHashtable $data -ErrorAction SilentlyContinue
    } catch {
+      #This is a vistigial behavior check that may not apply while -ErrorAction SilentlyContinue
       Write-Host "No entries found at level $($level)"
       return
    }
     #Clear the output file destination
     "" | Out-File -FilePath $saveTo
+    
     #Create a list and add each item to it, with a duplicates property added
-    #TODO: Modify duplicates to fit into an entry directly without a custom object
-       
     $bodyFiltered = [System.Collections.Generic.List[object]]::new()
     foreach($item in $body) {
-      $bodyFiltered.Add([PSCustomObject]@{
-         entry=$item
-         duplicates=0
-      })
+      $item | Add-Member -memberType NoteProperty -name "duplicates" -value 0
+      $bodyFiltered.add($item)
     }
+
     Write-Host -NoNewLine "Level: $($level) -- Entries: $($bodyFiltered.Count)"
-    #Loop through each event
+    #Loop through each event, comparing each entry to the entries that follow it.
+    #If an entry following has the same description as the comparing entry, then the entry following is removed 
+    #Mark each duplicate along the way
     for ( $i = 0; $i -lt $($bodyFiltered.count); $i++) {
-	    $checkFor = $bodyFiltered[$i].entry.FormatDescription()
-      
+	    $checkFor = $bodyFiltered[$i].FormatDescription()
 	    for ( $k = $i+1; $k -lt $($bodyFiltered.count); $k++) {
-         $innerCheck = $bodyFiltered[$k].entry.FormatDescription() 
-         
+         $innerCheck = $bodyFiltered[$k].FormatDescription() 
 		    if ( $innerCheck -eq $checkFor ) {
              $bodyFiltered[$i].duplicates += 1
              $bodyFiltered.RemoveAt($k)
              $k = $k - 1
 			    continue
 		    }
-
 	    }
     }
-    $temp = $bodyFiltered #| Sort-Object -Descending -Property TimeCreated
-
-    foreach($entry in $temp) {
-      $entry.entry | Add-Member -memberType NoteProperty -name "Duplicates" -value $entry.duplicates
-      $entry.entry | ConvertTo-HTML -Head $css MachineName,ID,TimeCreated,Message,Duplicates | Out-File -FilePath $saveTo -Append
+    foreach($entry in $bodyFiltered) {
+      $entry | ConvertTo-HTML -Head $css MachineName,ID,TimeCreated,Message,Duplicates | Out-File -FilePath $saveTo -Append
     } 
     Write-Host " -- Squished: $($bodyFiltered.Count)"
 }
